@@ -1,3 +1,5 @@
+"""회전형 용량 조절에 쓰는 기어드 DC 모터를 감싼 얇은 래퍼."""
+
 from worker.make_packet import MakePacket
 
 
@@ -15,10 +17,7 @@ class VolumeDCActuator:
     # Start rotating (MouseDown)
     # ======================================================
     def run(self, direction: int, duty: int):
-        """
-        direction: 1 = CW, 0 = CCW
-        duty: 0 ~ 100
-        """
+        """정규화된 방향값과 PWM duty 값으로 회전을 시작한다."""
         direction = 1 if int(direction) > 0 else 0
         duty = max(0, min(100, int(duty)))
 
@@ -32,4 +31,5 @@ class VolumeDCActuator:
     # Stop rotating (MouseUp)
     # ======================================================
     def stop(self):
+        """출력을 0으로 보내 DC 모터를 정지시킨다."""
         self.serial.send_pipette_stop(self.actuator_id)

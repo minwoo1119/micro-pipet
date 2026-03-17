@@ -1,4 +1,5 @@
-# worker/ocr_paddle.py
+"""TensorRT 대신 PaddleOCR 경로를 사용할 때의 대체 OCR 모듈."""
+
 import json
 import os
 import re
@@ -25,6 +26,7 @@ _ocr = PaddleOCR(
 # ROI utils
 # ----------------------------------------------------------
 def load_rois() -> List[List[float]]:
+    """YOLO가 마지막으로 저장한 ROI 목록을 읽어온다."""
     if not os.path.exists(ROIS_JSON_PATH):
         raise FileNotFoundError(f"ROIs not found: {ROIS_JSON_PATH}")
     with open(ROIS_JSON_PATH, "r", encoding="utf-8") as f:
@@ -36,10 +38,7 @@ def load_rois() -> List[List[float]]:
 # OCR result parsing (robust)
 # ----------------------------------------------------------
 def _extract_digits_from_paddle_result(result) -> str:
-    """
-    PaddleOCR rec-only 결과는 버전/상황에 따라 형태가 다소 달라질 수 있어서
-    최대한 방어적으로 문자열을 모은 뒤 숫자만 추출한다.
-    """
+    """버전별로 형태가 달라질 수 있는 Paddle 결과를 평탄화해 숫자만 추린다."""
     texts: List[str] = []
 
     def walk(x):
@@ -66,10 +65,7 @@ def _extract_digits_from_paddle_result(result) -> str:
 # Preprocess variants for 7-seg / low-contrast digits
 # ----------------------------------------------------------
 def _preprocess_variants(roi_bgr: np.ndarray) -> List[Tuple[str, np.ndarray]]:
-    """
-    ROI 한 장에서 OCR 성공률을 올리기 위한 여러 전처리 버전 생성.
-    - 원본 / Otsu 이진화 / 반전 / 2배 업샘플
-    """
+    """현장에서 자주 나오는 저대비/7세그 케이스를 대비해 전처리 버전을 여러 개 만든다."""
     variants: List[Tuple[str, np.ndarray]] = []
 
     # 1) raw
@@ -105,11 +101,7 @@ def _preprocess_variants(roi_bgr: np.ndarray) -> List[Tuple[str, np.ndarray]]:
 # OCR one digit with fallbacks
 # ----------------------------------------------------------
 def ocr_one_digit(roi_bgr: np.ndarray, debug_save: bool = False, idx: int = -1) -> Optional[int]:
-    """
-    ROI(한 자리)에서 숫자 1개를 최대한 robust하게 뽑는다.
-    - 여러 전처리 버전(raw/otsu/inv/upsample)을 순차 시도
-    - 숫자 1개라도 나오면 첫 digit을 반환
-    """
+    """한 자리 ROI에서 성공할 때까지 여러 전처리 버전을 순차적으로 시도한다."""
     for tag, img in _preprocess_variants(roi_bgr):
         try:
             # ✅ rec-only (det=False)
@@ -131,6 +123,7 @@ def ocr_one_digit(roi_bgr: np.ndarray, debug_save: bool = False, idx: int = -1) 
 # Main read volume
 # ----------------------------------------------------------
 def read_volume_paddle(frame: np.ndarray, debug_save: bool = False) -> int:
+    """ROI 4개를 읽어 TRT 경로와 같은 방식의 최종 용량값으로 합친다."""
     rois = load_rois()
     rois = sorted(rois, key=lambda r: r[1])  # 위→아래
 

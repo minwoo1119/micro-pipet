@@ -1,4 +1,5 @@
-# worker/control_worker.py
+"""현재 OCR 값을 기준으로 다음 모터 명령을 계산하는 비전 기반 제어 루프."""
+
 import json
 import time
 import sys
@@ -13,7 +14,7 @@ MAX_ITER = 60
 
 
 def _elog(msg: str):
-    # 사람 로그는 stderr로
+    """stdout은 기계 파싱용으로 비워두기 위해 사람이 읽는 로그는 stderr로 분리한다."""
     print(msg, file=sys.stderr, flush=True)
 
 
@@ -22,6 +23,7 @@ def run_to_target(
     camera_index: int = 0,
     max_iter: int = MAX_ITER,
 ):
+    """현재 용량을 반복 측정하면서 다음 보정 명령을 단계별 JSON으로 내보낸다."""
     print(">>> ENTER run_to_target()", flush=True)
     _elog("[RUN] run_to_target started (VISION ONLY)")
 
@@ -41,7 +43,7 @@ def run_to_target(
 
         final_volume = cur_volume
 
-        # 종료 조건
+        # 허용 오차 안으로 들어오면 호출부가 추가 제어 없이 종료할 수 있다.
         if abs(err) <= VOLUME_TOLERANCE:
             print(json.dumps({
                 "cmd": "done",
@@ -78,6 +80,7 @@ def run_to_target(
             f"dir={'CCW' if direction==1 else 'CW'} duty={duty} dur={duration_ms}ms"
         )
 
+        # 실제 모터 구동은 GUI 쪽에서 하므로, 여기서는 필요한 제어값만 전달한다.
         print(json.dumps({
             "cmd": "volume",
             "step": step,
@@ -104,7 +107,7 @@ def run_to_target(
 
     _elog("[CLEANUP] run_to_target finished")
 
-    # ✅ 실험/테스트용 반환값
+    # 테스트 코드에서는 이 요약값만 확인해도 전체 결과를 판단할 수 있게 해둔다.
     return {
         "success": success,
         "final_ul": final_volume,

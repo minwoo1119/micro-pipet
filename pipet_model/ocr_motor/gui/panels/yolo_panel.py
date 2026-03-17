@@ -1,3 +1,5 @@
+"""ROI 검출 결과를 확인하고 필요 시 다시 검출하는 운영용 패널."""
+
 import json
 import os
 
@@ -11,6 +13,7 @@ from PyQt5.QtCore import Qt
 
 class YoloPanel(QGroupBox):
     def __init__(self, controller, video_panel):
+        """ROI 재검출 버튼과 좌표 확인 영역을 구성한다."""
         super().__init__("YOLO ROI Detection (4 boxes)")
 
         self.controller = controller
@@ -37,6 +40,7 @@ class YoloPanel(QGroupBox):
         self.setLayout(layout)
 
     def _run(self, reset: bool):
+        """YOLO 1회 실행 결과를 받아 좌표를 정리하고 화면에 반영한다."""
         cam = int(self.video_panel.camera_spin.value())
         res = self.controller.yolo_detect(reset=reset, camera_index=cam)
 
@@ -60,24 +64,19 @@ class YoloPanel(QGroupBox):
             self.show_fixed_rois(frame_path, fixed_rois)
 
     def on_detect(self):
+        """일반적인 ROI 검출 버튼 동작이다."""
         print("[GUI] YOLO detect button clicked")
         self._run(reset=False)
 
     def on_reset(self):
+        """기존 ROI 저장값이 의심될 때 초기화 후 다시 검출한다."""
         self._run(reset=True)
 
     @staticmethod
     def normalize_vertical_rois(rois, expected_count=4):
-        """
-        return format:
-        [
-        [x, y, size, size],
-        [x, y + gap, size, size],
-        [x, y + 2*gap, size, size],
-        [x, y + 3*gap, size, size],
-        ]
-        """
+        """YOLO 박스를 OCR이 더 안정적으로 쓰도록 세로 정렬된 정사각 ROI로 보정한다."""
 
+        # 박스 수가 부족한데 억지 보정을 하면 더 헷갈리므로 원본 결과를 그대로 둔다.
         if len(rois) < expected_count:
             return rois
         
@@ -109,6 +108,7 @@ class YoloPanel(QGroupBox):
 
 
     def show_fixed_rois(self, image_path, fixed_rois):
+        """정규화된 ROI를 프레임 위에 그려 운영자가 바로 육안 검증할 수 있게 한다."""
         pixmap = QPixmap(image_path)
         if pixmap.isNull():
             print("[WARN] Failed to load image:", image_path)

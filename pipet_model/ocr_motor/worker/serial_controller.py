@@ -1,3 +1,5 @@
+"""기존 C# 통신 구조를 Python으로 옮긴 시리얼 전송 계층."""
+
 import time
 import threading
 import queue
@@ -62,6 +64,7 @@ class SerialController:
     # Connection
     # =========================
     def connect(self) -> bool:
+        """포트를 연 뒤 TX, RX, poll 스레드를 함께 띄워 기존 C# 동작 순서를 유지한다."""
         self.ser = serial.Serial(
             port=self.port,
             baudrate=self.baudrate,
@@ -94,11 +97,7 @@ class SerialController:
     # Graceful Close (🔥 필수)
     # =========================
     def close(self):
-        """
-        control_worker cleanup용
-        - thread 중단
-        - serial 안전 종료
-        """
+        """종료 시 호출하는 정리 메서드로, 스레드를 멈춘 뒤 포트를 안전하게 닫는다."""
         self.running = False
 
         # thread들이 loop 탈출할 시간
@@ -116,6 +115,7 @@ class SerialController:
     # TX
     # =========================
     def enqueue(self, packet: bytes):
+        """전송은 모두 큐를 거치므로, 호출부는 이 메서드만 써도 된다."""
         if not self.ser or not self.ser.is_open:
             return
 
@@ -127,6 +127,7 @@ class SerialController:
             print(f"[ENQUEUE] {packet.hex(' ')}")
 
     def _tx_worker(self):
+        """TX 큐에 들어온 패킷을 순서대로 실제 시리얼 포트로 내보낸다."""
         while self.running:
             try:
                 if not self.tx_queue.empty():
@@ -145,6 +146,7 @@ class SerialController:
     # Poll (C# Timer 복제)
     # =========================
     def _poll_worker(self):
+        """통신이 한가한 시점에만 상태 poll을 넣어 C# 타이머 방식과 동일하게 유지한다."""
         while self.running:
             try:
                 now = time.time()
@@ -176,6 +178,7 @@ class SerialController:
     # RX
     # =========================
     def _rx_worker(self):
+        """수신 바이트를 프레임 단위로 잘라 `_handle_frame`에 넘기는 역할만 담당한다."""
         buffer = bytearray()
 
         while self.running:
@@ -207,6 +210,7 @@ class SerialController:
             time.sleep(0.002)
 
     def _handle_frame(self, frame: bytes):
+        """정상 상태 프레임만 받아 최신 moving 상태를 내부 캐시에 반영한다."""
         if len(frame) != 13:
             return
 
@@ -234,6 +238,7 @@ class SerialController:
     # Blocking helper
     # =========================
     def move_and_wait(self, actuator_id: int, position: int, timeout: float = 5.0):
+        """예전 호출부 호환용 메서드로, 현재는 간단한 대기만 두고 있다."""
         self.enqueue(MakePacket.set_position(actuator_id, position))
 
         # C# 동일 동작
@@ -244,20 +249,25 @@ class SerialController:
     # High-level APIs (🔥 호환 필수)
     # =========================
     def send_mightyzap_set_position(self, actuator_id: int, position: int):
+        """호출부가 패킷 포맷을 몰라도 위치 명령을 보낼 수 있게 감싼 메서드다."""
         self.enqueue(MakePacket.set_position(actuator_id, position))
 
     def send_mightyzap_set_speed(self, actuator_id: int, speed: int):
+        """MightyZap 속도 명령을 전달한다."""
         self.enqueue(MakePacket.set_speed(actuator_id, speed))
 
     def send_mightyzap_set_current(self, actuator_id: int, current: int):
+        """MightyZap 전류 제한 명령을 전달한다."""
         self.enqueue(MakePacket.set_current(actuator_id, current))
 
     def send_mightyzap_force_onoff(self, actuator_id: int, onoff: int):
+        """기존 on/off 의미를 유지한 채 MightyZap force 모드를 전환한다."""
         self.enqueue(
             MakePacket.set_force_onoff(actuator_id, 1 if onoff else 0)
         )
 
     def send_pipette_change_volume(self, actuator_id: int, direction: int, duty: int):
+        """정규화한 방향과 duty 값으로 피펫 용량용 DC 모터를 구동한다."""
         direction = 0 if int(direction) <= 0 else 1
         duty = max(0, min(100, int(duty)))
         self.enqueue(
@@ -265,6 +275,7 @@ class SerialController:
         )
 
     def send_pipette_stop(self, actuator_id: int):
+        """duty 0 명령을 보내 피펫 용량용 DC 모터를 정지시킨다."""
         self.enqueue(
             MakePacket.pipette_change_volume(actuator_id, 0, 0)
         )

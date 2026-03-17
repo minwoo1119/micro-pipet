@@ -1,3 +1,5 @@
+"""GUI나 테스트 코드에서 단발성 작업을 호출할 때 사용하는 공용 worker 진입점."""
+
 import argparse
 import json
 import os
@@ -20,13 +22,7 @@ print("[WORKER] worker.py entry", flush=True)
 # Utils
 # ==================================================
 def rotate_frame(frame, rotate_code: int):
-    """
-    rotate_code:
-      0: no rotate
-      1: 90 CW
-      2: 90 CCW
-      3: 180
-    """
+    """카메라 방향 차이로 ROI 좌표계가 흔들리지 않도록 프레임 방향을 통일한다."""
     if rotate_code == 1:
         return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
     if rotate_code == 2:
@@ -37,6 +33,7 @@ def rotate_frame(frame, rotate_code: int):
 
 
 def main():
+    """인자로 지정된 작업 하나만 수행하고, 호출부가 읽기 쉽게 JSON 한 줄로 반환한다."""
     ap = argparse.ArgumentParser()
 
     # -------------------------------------------------
@@ -65,6 +62,7 @@ def main():
             pass
 
     def capture_rotated():
+        """캡처 직후 회전을 적용해 이후 YOLO/OCR이 항상 같은 방향의 프레임을 받게 한다."""
         frame = capture_one_frame(args.camera)
         return rotate_frame(frame, args.rotate)
 
@@ -100,6 +98,7 @@ def main():
         cv2.imwrite(FRAME_JPG_PATH, frame)
 
         if args.ocr_auto_rois and not os.path.exists(ROIS_JSON_PATH):
+            # OCR은 기존 ROI를 재사용하는 구조이므로, 없을 때만 YOLO로 최초 ROI를 만든다.
             run_yolo_on_frame(frame)
 
         trt_model = TRTWrapper(OCR_TRT_PATH)
@@ -115,6 +114,7 @@ def main():
     # Run to target (vision based)
     # -------------------------------------------------
     if args.run_target:
+        # 여기서는 제어 판단 결과만 내보내고, 실제 모터 구동은 시리얼 세션을 가진 GUI가 맡는다.
         run_to_target(target=args.target, camera_index=args.camera)
         print(json.dumps({"ok": True}))
         return

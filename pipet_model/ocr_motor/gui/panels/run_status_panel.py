@@ -1,3 +1,5 @@
+"""자동 목표 이동 과정의 상태 변화를 순서대로 누적해서 보여주는 로그 패널."""
+
 from PyQt5.QtWidgets import (
     QGroupBox, QTextEdit, QVBoxLayout
 )
@@ -8,6 +10,7 @@ from datetime import datetime
 
 class RunStatusPanel(QGroupBox):
     def __init__(self, controller):
+        """컨트롤러 상태 업데이트를 받아 시간순 로그로 쌓는다."""
         super().__init__("Run-To-Target Log")
 
         self.controller = controller
@@ -24,9 +27,7 @@ class RunStatusPanel(QGroupBox):
             controller.run_state_updated.connect(self.on_state_updated)
 
     def on_state_updated(self, s: dict):
-        """
-        매 step마다 append 되는 로그
-        """
+        """한 단계가 끝날 때마다 사람이 읽기 쉬운 한 줄 로그를 추가한다."""
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
         line = (
@@ -42,4 +43,3 @@ class RunStatusPanel(QGroupBox):
 
         self.log.append(line)
         self.log.moveCursor(QTextCursor.End)
-

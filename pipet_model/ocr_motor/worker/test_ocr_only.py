@@ -1,3 +1,5 @@
+"""저장된 프레임과 ROI 파일로 원본 PyTorch OCR 모델을 점검하는 디버그 스크립트."""
+
 import os
 import cv2
 import json
@@ -38,6 +40,7 @@ preprocess = transforms.Compose([
 
 
 def preprocess_roi(roi_bgr: np.ndarray) -> torch.Tensor:
+    """OpenCV ROI 1개를 PyTorch 모델이 기대하는 정규화 텐서로 변환한다."""
     rgb = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2RGB)
     pil = Image.fromarray(rgb)
     return preprocess(pil)   # (3,224,224) torch.Tensor
@@ -47,6 +50,7 @@ def preprocess_roi(roi_bgr: np.ndarray) -> torch.Tensor:
 # Load OCR model (PT)
 # ==============================
 def load_ocr_model():
+    """EfficientNet 구조를 다시 만들고 저장된 체크포인트 가중치를 올린다."""
     model = timm.create_model(
         "efficientnet_b0",
         pretrained=False,     # ✅ 반드시 False
@@ -63,6 +67,7 @@ def load_ocr_model():
 # MAIN (OCR ONLY)
 # ==============================
 def main():
+    """저장된 프레임/ROI를 읽어 자리별 OCR을 수행하고 최종 용량을 출력한다."""
     print("=== OCR ONLY (FROM SAVED FILES, PT) ===")
 
     # ---------------------------------
