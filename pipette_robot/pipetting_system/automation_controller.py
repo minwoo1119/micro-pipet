@@ -40,6 +40,15 @@ class AutomationController:
         - 툴 장착각(`RobotConfig.MOUNT_ANGLE_DEG`) 및 축 스왑 규칙을 적용해 툴 좌표 이동량으로 변환
         - 현재 TF의 툴 회전을 이용해 base_link 좌표계 상대 이동량으로 변환
         - 최종 목표 pos를 만들고 IK+이동을 요청
+
+        인수인계/디버깅 포인트(자주 헷갈림):
+        - 축 스왑(`dx_p, dy_p = dy_cam, dx_cam`)은 "카메라에서 보이는 XY"와
+          "로봇이 실제로 움직여야 하는 XY"의 대응을 맞추기 위한 규칙입니다.
+          설치 방향이 바뀌면 이 부분/부호/장착각이 동시에 영향을 줍니다.
+        - 로봇이 반대로 움직일 때는 보통 아래 순서로 점검합니다.
+          1) `RobotConfig.MOUNT_ANGLE_DEG` (실제 장착각과 일치?)
+          2) 축 스왑/부호(`dx_p, dy_p` 및 `execute_relative_move(-x_cam, y_cam, ...)` 호출부)
+          3) 태그 회전 오프셋(`WellPlateConfig.TAG_*_OFFSET_DEG`)로 인한 웰 방향 틀어짐
         """
         try:
             # [수정] TF가 사용 가능할 때까지 최대 2초간 대기
@@ -124,6 +133,12 @@ class AutomationController:
 
         - 태그 포즈를 기준 프레임처럼 사용하여 로컬 좌표의 웰 위치를 카메라 좌표로 변환합니다.
         - 이후 `execute_relative_move()`로 이동을 수행합니다.
+
+        인수인계/운영 전제:
+        - (row, col)은 코드 상에서 0-index 입니다. GUI에서 A1~D6는 내부적으로
+          row=A..D → 0..3, col=1..6 → 0..5로 매핑됩니다.
+        - 로컬 좌표(`P_local`)의 축 방향은 "태그를 기준으로 플레이트가 놓인 방향"에 따라 달라질 수 있습니다.
+          웰 이동 방향이 뒤집히면 `P_local` 정의(부호/축) 또는 태그 회전 오프셋을 먼저 의심합니다.
         """
         if self._is_sequence_running:
             return
@@ -211,7 +226,13 @@ class AutomationController:
         return False
 
     def run_pipette_sequence(self, pip_offset_x, pip_offset_y, pip_down_z):
-        """피펫 시퀀스 실행: 오프셋 이동 -> 하강 -> 상승 -> 복귀"""
+        """피펫 시퀀스 실행: 오프셋 이동 -> 하강 -> 상승 -> 복귀
+
+        파라미터 규칙(안전/부호):
+        - `pip_offset_x`, `pip_offset_y`: m 단위의 XY 오프셋(양/음 모두 가능)
+        - `pip_down_z`: "하강 거리"를 양수(m)로 입력합니다.
+          실제 하강은 내부에서 `-pip_down_z`로 적용되므로, 실수로 음수를 넣으면 상승이 되어버릴 수 있습니다.
+        """
         if self._is_sequence_running:
             return
         def seq():

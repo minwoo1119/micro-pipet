@@ -81,6 +81,12 @@ class TagDetectorWrapper:
         - `K`, `dist`: 카메라 내참/왜곡(현재 구현은 dist=0 가정)
         - `tag_pose_info`: 태그가 있으면 dict, 없으면 None
         - `timestamp`: 카메라에서 읽은 시점(time.time 기반)
+
+        인수인계/운영 전제:
+        - 여러 태그가 검출되는 경우에도 현재 구현은 `detections[0]` 1개만 사용합니다.
+          (현장에서는 "시야 내 태그는 1개"라는 전제를 두는 편이 안전합니다.)
+        - 결과 공유 방식은 `self.latest_result`에 "마지막 처리 결과"를 덮어쓰는 형태입니다.
+          다른 계층은 이를 폴링하므로, 타임스탬프/프레임 신선도 조건(`min_timestamp`)이 중요합니다.
         """
         if not hasattr(self.cam, 'get_frame'):
             return None

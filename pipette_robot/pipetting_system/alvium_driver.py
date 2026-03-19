@@ -51,7 +51,12 @@ class AlviumCamera:
         print(f"[AlviumDriver] Camera index {self.camera_index} started.")
 
     def stop(self):
-        """카메라 스트리밍 중지"""
+        """카메라 스트리밍 중지
+
+        인수인계 팁:
+        - 내부 스트리밍 루프는 SDK 프레임 generator의 timeout 영향을 받으므로,
+          환경에 따라 stop()이 즉시 끝나지 않고 수 초 지연될 수 있습니다.
+        """
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join()
@@ -61,6 +66,11 @@ class AlviumCamera:
         """
         가장 최근 프레임을 반환 (Thread-safe)
         Return: (frame_image, timestamp) or (None, 0)
+
+        주의(타임스탬프 의미):
+        - 현재 구현의 timestamp는 "프레임 캡처 시각"이 아니라 `get_frame()` 호출 시각(`time.time()`)입니다.
+          따라서 `min_timestamp` 같은 가드는 "폴링 루프에서 같은 프레임을 반복 처리하는 것"을 줄여주는 용도에 가깝고,
+          엄밀한 센서 타임스탬프/프레임 신선도를 보장하지는 않습니다.
         """
         with self.lock:
             if self.frame is not None:

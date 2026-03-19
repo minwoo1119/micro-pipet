@@ -63,7 +63,14 @@ class URInterface(Node):
         return self._last_q
 
     def get_ik_sync(self, pos, rot, seed_q):
-        """IK 서비스를 동기적으로 호출하여 해를 즉시 반환 (궤적 생성용)"""
+        """IK 서비스를 동기적으로 호출하여 해를 즉시 반환 (궤적 생성용)
+
+        인수인계/운영 전제(중요):
+        - 이 함수는 `/joint_states`를 최소 1회 이상 수신하여 `self._joint_order`가 준비된 이후에만
+          정상 동작할 수 있습니다. (그 전에는 seed/조인트 순서를 만들 수 없음)
+        - 블로킹 호출이므로 executor spin을 담당하는 스레드(또는 Tkinter 메인 스레드)에서
+          과도하게 호출하면 앱이 멈춘 것처럼 보일 수 있습니다.
+        """
         if not self.ik_cli.service_is_ready():
             return None
         req = GetPositionIK.Request()
@@ -84,7 +91,13 @@ class URInterface(Node):
         return None
 
     def solve_ik_and_move(self, target_pos, target_rot, duration_sec=None, callback=None):
-        """IK를 계산하고 궤적을 전송 (비동기)"""
+        """IK를 계산하고 궤적을 전송 (비동기)
+
+        실패가 "무반응"처럼 보이는 대표 케이스:
+        - `/joint_states` 미수신으로 `self._joint_order` / `self._last_q`가 준비되지 않음(초기 구동 직후)
+        - `/compute_ik` 서비스가 준비되지 않음(MoveIt 미기동)
+        - FollowJointTrajectory Action server가 준비되지 않음(UR driver/컨트롤러 미기동)
+        """
         if self._joint_order is None or not self._last_q:
             return
         req = GetPositionIK.Request()
